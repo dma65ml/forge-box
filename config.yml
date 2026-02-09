@@ -1,0 +1,33 @@
+log:
+  level: info        # Niveau de logs du runner (console)
+  job_level: info    # Niveau de logs envoyes a Forgejo
+
+runner:
+  file: .runner      # Fichier ou est stockee l'inscription du runner
+  capacity: 1        # Nombre de jobs simultanes autorises
+  envs:              # Variables d'environnement injectees dans chaque job
+    DOCKER_HOST: tcp://docker_dind:2375   # Acces au daemon Docker-in-Docker
+  timeout: 3h        # Temps max pour executer un job
+  shutdown_timeout: 3h
+  fetch_timeout: 5s
+  fetch_interval: 2s
+  report_interval: 1s
+  insecure: true    # false = verifie le certificat SSL (OK en HTTP local)
+  labels:            # Labels du runner (a adapter a ton choix)
+    - docker
+    - linux
+    - local
+
+container:
+  privileged: true   # Obligatoire pour executer Docker-in-Docker
+  docker_host: "tcp://docker_dind:2375"   # Adresse du daemon DIND
+  options: "--add-host=docker_dind:host-gateway"
+  network: "host"        # Utilise le reseau auto-genere ou celui du runner
+  enable_ipv6: false
+  valid_volumes: []  # Empeche le montage sauvage de volumes
+  force_pull: false
+  force_rebuild: false
+
+host:
+  workdir_parent: "" # Laisser vide = dossier par defaut (~/.cache/act/)
+

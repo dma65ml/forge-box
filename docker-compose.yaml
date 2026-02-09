@@ -1,0 +1,109 @@
+services:
+
+  server:
+    image: codeberg.org/forgejo/forgejo:13
+    container_name: forgejo
+    restart: always
+
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+
+      # Configuration base de données
+      - FORGEJO__database__DB_TYPE=postgres
+      - FORGEJO__database__HOST=db:5432
+      - FORGEJO__database__NAME=forgejo
+      - FORGEJO__database__USER=forgejo
+      - FORGEJO__database__PASSWD=forgejo
+
+    volumes:
+      - ./forgejo:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+
+    ports:
+      - "3000:3000"
+      - "222:22"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    networks:
+      - forgejo-net
+
+
+  db:
+    image: postgres:14
+    restart: always
+    container_name: forgejo_postgres
+
+    environment:
+      - POSTGRES_USER=forgejo
+      - POSTGRES_PASSWORD=forgejo
+      - POSTGRES_DB=forgejo
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8
+
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgejo -d forgejo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+    networks:
+      - forgejo-net
+
+
+  docker-in-docker:
+    image: docker:27.1-dind
+    container_name: docker_dind
+    privileged: true
+    restart: unless-stopped
+
+    command:
+      - dockerd
+      - "-H"
+      - "tcp://0.0.0.0:2375"
+      - "--tls=false"
+
+    volumes:
+      - ./dind:/var/lib/docker
+
+    networks:
+      - forgejo-net
+
+
+  runner:
+    image: data.forgejo.org/forgejo/runner:11
+    container_name: runner
+    restart: unless-stopped
+
+    environment:
+      - DOCKER_HOST=tcp://docker-in-docker:2375
+
+    # utilisateur non-root : OK
+    user: 1001:1001
+
+    volumes:
+      - ./data:/data
+
+    depends_on:
+      docker-in-docker:
+        condition: service_started
+
+    # Lancement initial pour enregistrement de forgejo-runner avec forgejo 
+    command: '/bin/sh -c "while : ; do sleep 1 ; done ;"'
+    # Lancement normal du daemon runner
+    # command: '/bin/sh -c "sleep 5; forgejo-runner daemon --config config.yml"'
+
+    networks:
+      - forgejo-net
+
+
+networks:
+  forgejo-net:
+    driver: bridge
+
